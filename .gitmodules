@@ -1,0 +1,3 @@
+[submodule "src/android"]
+	path = src/android
+	url = https://github.com/patrickgold/icu4c-android
