@@ -27,7 +27,7 @@ cd "$(realpath "$(dirname "$0")")" || exit 1
 # Clean prebuilt dir to guarantee a clean rebuild
 rm -r ./prebuilt
 
-./src/android/cc-icu4c.sh build \
+bash src/android/cc-icu4c.sh build \
     --arch=arm,arm64,x86,x86_64 \
     --api=23 \
     --library-type=static \
