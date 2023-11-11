@@ -1,0 +1,22 @@
+--- src/icu/icu4c/source/common/unicode/uconfig.h	2023-11-11 23:12:20.769074228 +0100
++++ uconfig.h	2023-11-11 23:19:42.859046861 +0100
+@@ -17,6 +17,19 @@
+ #ifndef __UCONFIG_H__
+ #define __UCONFIG_H__
+ 
++#define U_DISABLE_RENAMING 1
++#define U_HAVE_LIB_SUFFIX 1
++#define U_LIB_SUFFIX_C_NAME __floris
++
++#define U_USING_NAMESPACE 0
++#define U_HAVE_NL_LANGINFO_CODESET 0
++#define U_HIDE_OBSOLETE_UTF_OLD_H 1
++#define U_TIMEZONE 0
++#define UCONFIG_NO_COLLATION 0
++#define UCONFIG_NO_FORMATTING 0
++#define UCONFIG_NO_LEGACY_CONVERSION 0
++#define UCONFIG_NO_REGULAR_EXPRESSIONS 0
++#define UCONFIG_NO_TRANSLITERATION 0
+ 
+ /*!
+  * \file
