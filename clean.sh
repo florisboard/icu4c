@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Copyright 2021 Patrick Goldinger
+# Copyright 2023 Patrick Goldinger
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,20 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build script for ICU4C, tailored exactly for FlorisBoard's needs.
-
-# Before executing this script to manually rebuild the ICU libraries, make sure to execute
-#  git submodule update --init --recursive
-# else the script won't find the ICU source files!
-
-###### Build ICU4C ######
+###### Clean ICU4C ######
 
 cd "$(realpath "$(dirname "$0")")" || exit 1
 
-rm -r ./prebuilt
-rm -r ./build
-
-git submodule foreach --recursive git reset --hard
-git submodule update --init --recursive
-
-exit 0
+rm -rf ./prebuilt 2>/dev/null
+rm -rf ./build 2>/dev/null
+rm -rf ./src/icu 2>/dev/null
