@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Copyright 2021 Patrick Goldinger
+# Copyright 2023 Patrick Goldinger
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,32 +16,74 @@
 
 # Build script for ICU4C, tailored exactly for FlorisBoard's needs.
 
-# Before executing this script to manually rebuild the ICU libraries, make sure to execute
-#  git submodule update --init --recursive
-# else the script won't find the ICU source files!
-
 ###### Build ICU4C ######
 
+# Script params
+
+icu_version_major=73
+icu_version_minor=1
+icu_libs=("uc" "tu" "i18n" "io" "data")
+abi_list=("armeabi-v7a" "arm64-v8a" "x86" "x86_64")
+android_api=24
+
+# Script setup
+
 cd "$(realpath "$(dirname "$0")")" || exit 1
+if [[ -n "$ANDROID_HOME" ]]; then
+    echo "Using Android SDK @ $ANDROID_HOME"
+    llvm_toolchain="$ANDROID_HOME/ndk"
+elif [[ -n "$ANDROID_SDK_ROOT" ]]; then
+    echo "Using Android SDK @ $ANDROID_SDK_ROOT"
+    llvm_toolchain="$ANDROID_SDK_ROOT/ndk"
+else
+    echo "Neither \$ANDROID_HOME nor \$ANDROID_SDK_ROOT is set, aborting!"
+    exit 1
+fi
+llvm_toolchain=$(find "$llvm_toolchain" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
+if [[ -n "$llvm_toolchain" ]]; then
+    echo "Using Android NDK @ $llvm_toolchain"
+else
+    echo "Failed to find NDK installation from selected Android SDK, aborting!"
+    exit 1
+fi
+llvm_toolchain="$llvm_toolchain/toolchains/llvm/prebuilt/linux-$(uname -m)"
+if [[ -d "$llvm_toolchain" ]]; then
+    echo "Using LLVM toolchain @ $llvm_toolchain"
+else
+    echo "Failed to find LLVM toolchain, aborting!"
+    exit 1
+fi
 
-# Clean prebuilt dir to guarantee a clean rebuild
-rm -r ./prebuilt
+# Clean directories to guarantee a clean rebuild
 
-bash src/android/cc-icu4c.sh build \
-    --arch=arm,arm64,x86,x86_64 \
-    --api=23 \
-    --library-type=static \
-    --build-dir=./build \
-    --icu-src-dir=./src/android/icu/icu4c \
-    --install-include-dir=./prebuilt/include \
-    --install-libs-dir=./prebuilt/jniLibs \
-    --install-data-dir=./prebuilt/assets/icu \
-    --data-filter-file=./src/data-feature-filter.json \
-    --data-packaging=archive \
-    --enable-collation=no \
-    --enable-formatting=no \
-    --enable-legacy-converters=yes \
-    --enable-regex=no \
-    --enable-transliteration=no
+rm -rf ./prebuilt 2>/dev/null
+rm -rf ./build 2>/dev/null
+rm -rf ./src/icu 2>/dev/null
 
-exit $?
+# Build for each ABI
+
+for abi in "${abi_list[@]}"; do
+    cmake -B=build -S=src \
+        -DFLORIS_LIBRARY_TYPE=STATIC \
+        -DANDROID=1 \
+        -DCMAKE_ANDROID_API=$android_api \
+        -DCMAKE_ANDROID_ARCH_ABI=$abi \
+        -DLLVM_TOOLCHAIN=$llvm_toolchain \
+        -DICU_DUMMY_TARGET=1
+    cmake --build build
+done
+
+# Install to prebuilt directory
+
+for abi in "${abi_list[@]}"; do
+    mkdir -p prebuilt/jniLibs/$abi
+    for icu_lib in "${icu_libs[@]}"; do
+        cp build/android/$abi/lib/libicu${icu_lib}_floris.a \
+            prebuilt/jniLibs/$abi/libicu${icu_lib}_floris.a
+    done
+done
+mkdir -p prebuilt/assets/icu
+cp build/host/share/icu_floris/$icu_version_major.$icu_version_minor/icudt${icu_version_major}l.dat \
+    prebuilt/assets/icu/icudt.dat
+mkdir -p prebuilt/include
+cp -r build/host/include/* prebuilt/include
