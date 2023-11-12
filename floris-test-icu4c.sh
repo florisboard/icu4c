@@ -29,12 +29,13 @@ cd "$(realpath "$(dirname "$0")")" || exit 1
 
 # Execute tests
 
+lib_dir="prebuilt/libs/desktop/$(uname -m)-linux-gnu"
 mkdir -p "$build_dir"
 for test_file in "${test_files[@]}"; do
     /usr/bin/c++ "test/$test_file.cpp" \
         -o "$build_dir/$test_file.out" \
-        -Ibuild/host/include \
-        -Lbuild/host/lib \
+        -Iprebuilt/include \
+        -L$lib_dir \
         -licuuc_floris -licudata_floris
     ICU_DATA="prebuilt/assets/icu" ./$build_dir/$test_file.out
 done
