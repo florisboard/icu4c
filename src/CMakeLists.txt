@@ -228,15 +228,6 @@ if(ICU_ASSET_EXPORT_DIR)
             ${dst_asset_dir}/LICENSE)
 endif()
 
-# Add function and cache for compiler definitions
-# This is vital or any target which links against any ICU lib will not compile!!
-set_property(GLOBAL PROPERTY __icu_cpp_flags ${ICU_CPP_FLAGS})
-function(target_link_icu4c_libraries target_name target_type lib1)
-    get_property(icu_cpp_flags GLOBAL PROPERTY __icu_cpp_flags)
-    target_compile_definitions(${target_name} ${target_type} ${icu_cpp_flags})
-    target_link_libraries(${target_name} ${target_type} ${lib1} ${ARGN})
-endfunction()
-
 if(ICU_DUMMY_TARGET)
     add_custom_target(icu4c_dummy_target ALL)
     add_dependencies(icu4c_dummy_target icu4c)
