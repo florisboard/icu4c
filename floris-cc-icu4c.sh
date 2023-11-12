@@ -84,6 +84,6 @@ for abi in "${abi_list[@]}"; do
 done
 mkdir -p prebuilt/assets/icu
 cp build/host/share/icu_floris/$icu_version_major.$icu_version_minor/icudt${icu_version_major}l.dat \
-    prebuilt/assets/icu/icudt.dat
+    prebuilt/assets/icu/icudt${icu_version_major}l.dat
 mkdir -p prebuilt/include
 cp -r build/host/include/* prebuilt/include

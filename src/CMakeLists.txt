@@ -221,7 +221,7 @@ if(ICU_ASSET_EXPORT_DIR)
     add_custom_command(TARGET ${ICU_TARGET} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${src_asset_dir}/icudt${ICU_VERSION_MAJOR}l.dat
-            ${dst_asset_dir}/icudt.dat)
+            ${dst_asset_dir}/icudt${ICU_VERSION_MAJOR}l.dat)
     add_custom_command(TARGET ${ICU_TARGET} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${src_asset_dir}/LICENSE
