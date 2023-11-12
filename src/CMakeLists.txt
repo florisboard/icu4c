@@ -1,19 +1,20 @@
 cmake_minimum_required(VERSION 3.22)
 
+# https://unicode-org.github.io/icu/userguide/icu4c/build.html#how-to-build-and-install-on-unix
 project(ICU4C)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
 
+include(EnforceSystemEnv)
+include(FindGnuMake)
 include(ExternalProject)
 include(ProcessorCount)
-# Locate GNU make utlility, as ICU requires GNU make.
-#  See: https://unicode-org.github.io/icu/userguide/icu4c/build.html#how-to-build-and-install-on-unix
-include(FindGnuMake)
 
 # ----- SETUP LIBRARIES, HELPER FUNCTIONS AND FLAGS ----- #
 
 set(ICU_VERSION_MAJOR 73)
 set(ICU_VERSION_MINOR 1)
+set(ICU_LIBS uc tu i18n io data)
 
 ExternalProject_Add(
     ICU4C
@@ -34,14 +35,12 @@ ExternalProject_Add(
 add_library(icu4c INTERFACE)
 
 # We use a custom namespace to avoid any ambiguity with the default ICU namespace
-set(ICU_LIBS uc tu i18n io data)
 foreach(lib ${ICU_LIBS})
     add_library(icu${lib} ${FLORIS_LIBRARY_TYPE} IMPORTED GLOBAL)
     add_library(FlorisICU::${lib} ALIAS icu${lib})
     add_dependencies(icu${lib} icu4c)
 endforeach()
 
-# TODO: Reevaluate and fine-tune ICU config and data filter json!!
 set(ICU_LIB_NAME_SUFFIX _floris)
 if(BUILD_SHARED_LIBS)
     set(ICU_LIB_PREFIX ${FLORIS_LIBRARY_PREFIX})
@@ -71,12 +70,12 @@ set(ICU_LDFLAGS ${FLORIS_LINK_OPTIONS} -pthread)
 
 set(ICU_DATA_FILTER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/data-feature-filter.json)
 set(ICU_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/icu/icu4c)
-if (NOT ICU_BUILD_DIR)
+if(NOT ICU_BUILD_DIR)
     set(ICU_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 ProcessorCount(NUM_JOBS)
 
-if(NOT DEFINED LLVM_TOOLCHAIN)
+if(NOT LLVM_TOOLCHAIN)
     get_filename_component(LLVM_TOOLCHAIN ${CMAKE_CXX_COMPILER} DIRECTORY)
     get_filename_component(LLVM_TOOLCHAIN ${LLVM_TOOLCHAIN} DIRECTORY)
 endif()
@@ -92,13 +91,11 @@ set(ICU_HOST_ENV_CMAKE
         CPPFLAGS="${ICU_CPP_FLAGS}" LDFLAGS="${ICU_LDFLAGS}")
 set(ICU_HOST_INSTALL_BYPRODUCTS)
 foreach(lib ${ICU_LIBS})
-    if(NOT ANDROID)
-        list(APPEND ICU_HOST_INSTALL_BYPRODUCTS
-            ${ICU_HOST_INSTALL_DIR}/lib/${ICU_LIB_PREFIX}icu${lib}${ICU_LIB_SUFFIX}
-            ${FLORIS_LIBRARY_OUTPUT_DIRECTORY}/${ICU_LIB_PREFIX}icu${lib}${ICU_LIB_SUFFIX})
-    else()
-        list(APPEND ICU_HOST_INSTALL_BYPRODUCTS
+    list(APPEND ICU_HOST_INSTALL_BYPRODUCTS
         ${ICU_HOST_INSTALL_DIR}/lib/${ICU_LIB_PREFIX}icu${lib}${ICU_LIB_SUFFIX})
+    if(FLORIS_LIBRARY_OUTPUT_DIRECTORY)
+        list(APPEND ICU_HOST_INSTALL_BYPRODUCTS
+            ${FLORIS_LIBRARY_OUTPUT_DIRECTORY}/${ICU_LIB_PREFIX}icu${lib}${ICU_LIB_SUFFIX})
     endif()
 endforeach()
 
@@ -126,7 +123,7 @@ set(ICU_TARGET icu4c_host)
 
 # ----- CROSS-COMPILE TO ANDROID ----- #
 
-if(ANDROID)
+if(ANDROID AND NOT ICU_DESKTOP_TARGET)
     if(CMAKE_ANDROID_ARCH_ABI STREQUAL "armeabi-v7a")
         set(ICU_ANDROID_TARGET "armv7a-linux-androideabi")
     elseif(CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
@@ -169,8 +166,11 @@ if(ANDROID)
     set(ICU_ANDROID_INSTALL_BYPRODUCTS)
     foreach(lib ${ICU_LIBS})
         list(APPEND ICU_ANDROID_INSTALL_BYPRODUCTS
-            ${ICU_ANDROID_INSTALL_DIR}/lib/${ICU_LIB_PREFIX}icu${lib}${ICU_LIB_SUFFIX}
-            ${FLORIS_LIBRARY_OUTPUT_DIRECTORY}/${ICU_LIB_PREFIX}icu${lib}${ICU_LIB_SUFFIX})
+            ${ICU_ANDROID_INSTALL_DIR}/lib/${ICU_LIB_PREFIX}icu${lib}${ICU_LIB_SUFFIX})
+        if(FLORIS_LIBRARY_OUTPUT_DIRECTORY)
+            list(APPEND ICU_ANDROID_INSTALL_BYPRODUCTS
+                ${FLORIS_LIBRARY_OUTPUT_DIRECTORY}/${ICU_LIB_PREFIX}icu${lib}${ICU_LIB_SUFFIX})
+        endif()
     endforeach()
 
     add_custom_target(
@@ -195,6 +195,67 @@ if(ANDROID)
     set(ICU_LIB_DIR ${ICU_ANDROID_INSTALL_DIR}/lib)
     set(ICU_INCLUDE_DIR ${ICU_ANDROID_INSTALL_DIR}/include)
     set(ICU_TARGET icu4c_android)
+endif()
+
+# ----- CROSS-COMPILE TO DESKTOP ----- #
+
+if(ICU_DESKTOP_TARGET)
+    set(ICU_DESKTOP_BUILD_DIR ${ICU_BUILD_DIR}/.intermediate/desktop/${ICU_DESKTOP_TARGET})
+    set(ICU_DESKTOP_INSTALL_DIR ${ICU_BUILD_DIR}/desktop/${ICU_DESKTOP_TARGET})
+    file(MAKE_DIRECTORY ${ICU_DESKTOP_BUILD_DIR}) # Need to make build directory as ICU script requires this
+    set(ICU_DESKTOP_CC ${LLVM_TOOLCHAIN}/bin/clang)
+    set(ICU_DESKTOP_CXX ${LLVM_TOOLCHAIN}/bin/clang++)
+    set(ICU_DESKTOP_ENV_CMAKE
+        ${CMAKE_COMMAND} -E env
+        TOOLCHAIN=${LLVM_TOOLCHAIN}
+        TARGET=${ICU_DESKTOP_TARGET}
+        AR=${LLVM_TOOLCHAIN}/bin/llvm-ar
+        AS=${ICU_DESKTOP_CC}
+        CC=${ICU_DESKTOP_CC}
+        CXX=${ICU_DESKTOP_CXX}
+        LD=${LLVM_TOOLCHAIN}/bin/ld
+        RANLIB=${LLVM_TOOLCHAIN}/bin/llvm-ranlib
+        STRIP=${LLVM_TOOLCHAIN}/bin/llvm-strip
+        CFLAGS="${ICU_C_FLAGS}"
+        CXXFLAGS="${ICU_CXX_FLAGS}"
+        CPPFLAGS="${ICU_CPP_FLAGS}"
+        LDFLAGS="${ICU_LDFLAGS}"
+        ICU_SOURCES=${ICU_SRC_DIR}
+        ICU_DATA_FILTER_FILE=${ICU_DATA_FILTER_FILE}
+        ICU_CROSS_BUILD=${ICU_HOST_BUILD_DIR}
+    )
+    set(ICU_DESKTOP_INSTALL_BYPRODUCTS)
+    foreach(lib ${ICU_LIBS})
+        list(APPEND ICU_DESKTOP_INSTALL_BYPRODUCTS
+            ${ICU_DESKTOP_INSTALL_DIR}/lib/${ICU_LIB_PREFIX}icu${lib}${ICU_LIB_SUFFIX})
+        if(FLORIS_LIBRARY_OUTPUT_DIRECTORY)
+            list(APPEND ICU_DESKTOP_INSTALL_BYPRODUCTS
+                ${FLORIS_LIBRARY_OUTPUT_DIRECTORY}/${ICU_LIB_PREFIX}icu${lib}${ICU_LIB_SUFFIX})
+        endif()
+    endforeach()
+
+    add_custom_target(
+        icu4c_desktop_configure
+        COMMAND ${ICU_DESKTOP_ENV_CMAKE} ${ICU_SRC_DIR}/source/configure --with-cross-build=${ICU_HOST_BUILD_DIR}
+            --host=${ICU_DESKTOP_TARGET} --prefix=${ICU_DESKTOP_INSTALL_DIR} ${ICU_CONFIGURE_ARGS}
+        DEPENDS icu4c_host
+        WORKING_DIRECTORY ${ICU_DESKTOP_BUILD_DIR})
+    add_custom_target(
+        icu4c_desktop_build
+        COMMAND ${ICU_DESKTOP_ENV_CMAKE} ${GNU_MAKE_PROGRAM} -j ${NUM_JOBS} >/dev/null
+        DEPENDS icu4c_desktop_configure
+        WORKING_DIRECTORY ${ICU_DESKTOP_BUILD_DIR})
+    add_custom_target(
+        icu4c_desktop
+        COMMAND ${ICU_DESKTOP_ENV_CMAKE} ${GNU_MAKE_PROGRAM} install >/dev/null
+        DEPENDS icu4c_desktop_build
+        BYPRODUCTS ${ICU_DESKTOP_INSTALL_BYPRODUCTS}
+        WORKING_DIRECTORY ${ICU_DESKTOP_BUILD_DIR})
+    add_dependencies(icu4c icu4c_desktop)
+
+    set(ICU_LIB_DIR ${ICU_DESKTOP_INSTALL_DIR}/lib)
+    set(ICU_INCLUDE_DIR ${ICU_DESKTOP_INSTALL_DIR}/include)
+    set(ICU_TARGET icu4c_desktop)
 endif()
 
 # ----- FINALIZE ----- #
@@ -228,7 +289,7 @@ if(ICU_ASSET_EXPORT_DIR)
             ${dst_asset_dir}/LICENSE)
 endif()
 
-if(ICU_DUMMY_TARGET)
-    add_custom_target(icu4c_dummy_target ALL)
-    add_dependencies(icu4c_dummy_target icu4c)
+if(ICU_PREBUILT_TARGET)
+    add_custom_target(icu4c_prebuilt_target ALL)
+    add_dependencies(icu4c_prebuilt_target icu4c)
 endif()
