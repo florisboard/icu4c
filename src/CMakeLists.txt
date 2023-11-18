@@ -1,9 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 # https://unicode-org.github.io/icu/userguide/icu4c/build.html#how-to-build-and-install-on-unix
-project(ICU4C)
-
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
+project(ICU4C_SOURCE_BUILD)
 
 include(EnforceSystemEnv)
 include(FindGnuMake)
@@ -12,19 +10,16 @@ include(ProcessorCount)
 
 # ----- SETUP LIBRARIES, HELPER FUNCTIONS AND FLAGS ----- #
 
-set(ICU_VERSION_MAJOR 73)
-set(ICU_VERSION_MINOR 1)
-set(ICU_LIBS uc tu i18n io data)
-
+set(ICU_SOURCE_REPO_DIR "${CMAKE_CURRENT_BINARY_DIR}/icu_source_repo")
 ExternalProject_Add(
-    ICU4C
+    icu_source_repo
     GIT_REPOSITORY https://github.com/unicode-org/icu
     GIT_TAG release-${ICU_VERSION_MAJOR}-${ICU_VERSION_MINOR}
     GIT_SHALLOW TRUE
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/icu
+    SOURCE_DIR "${ICU_SOURCE_REPO_DIR}"
     UPDATE_DISCONNECTED TRUE
     PATCH_COMMAND
-        patch "${CMAKE_CURRENT_SOURCE_DIR}/icu/icu4c/source/common/unicode/uconfig.h"
+        patch "${ICU_SOURCE_REPO_DIR}/icu4c/source/common/unicode/uconfig.h"
             < "${CMAKE_CURRENT_SOURCE_DIR}/patches/uconfig_h.patch"
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ""
@@ -69,7 +64,7 @@ set(ICU_CPP_FLAGS ${cpp_flags_prefix})
 set(ICU_LDFLAGS ${FLORIS_LINK_OPTIONS} -pthread)
 
 set(ICU_DATA_FILTER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/data-feature-filter.json)
-set(ICU_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/icu/icu4c)
+set(ICU_SRC_DIR "${ICU_SOURCE_REPO_DIR}/icu4c")
 if(NOT ICU_BUILD_DIR)
     set(ICU_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR})
 endif()
@@ -103,6 +98,7 @@ add_custom_target(
     icu4c_host_configure
     COMMAND ${ICU_HOST_ENV_CMAKE} ${ICU_SRC_DIR}/source/configure
       -q --prefix=${ICU_HOST_INSTALL_DIR} ${ICU_CONFIGURE_ARGS}
+    DEPENDS icu_source_repo
     WORKING_DIRECTORY ${ICU_HOST_BUILD_DIR})
 add_custom_target(
     icu4c_host_build
@@ -123,7 +119,7 @@ set(ICU_TARGET icu4c_host)
 
 # ----- CROSS-COMPILE TO ANDROID ----- #
 
-if(ANDROID AND NOT ICU_DESKTOP_TARGET)
+if(ANDROID)
     if(CMAKE_ANDROID_ARCH_ABI STREQUAL "armeabi-v7a")
         set(ICU_ANDROID_TARGET "armv7a-linux-androideabi")
     elseif(CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
@@ -265,7 +261,7 @@ file(MAKE_DIRECTORY ${ICU_INCLUDE_DIR})
 
 foreach(lib ${ICU_LIBS})
     set(intermediate_lib_path ${ICU_LIB_DIR}/${ICU_LIB_PREFIX}icu${lib}${ICU_LIB_SUFFIX})
-    if(DEFINED FLORIS_LIBRARY_OUTPUT_DIRECTORY)
+    if(FLORIS_LIBRARY_OUTPUT_DIRECTORY)
         set(lib_path ${FLORIS_LIBRARY_OUTPUT_DIRECTORY}/${ICU_LIB_PREFIX}icu${lib}${ICU_LIB_SUFFIX})
         add_custom_command(TARGET ${ICU_TARGET} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different ${intermediate_lib_path} ${lib_path})

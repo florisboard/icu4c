@@ -71,49 +71,108 @@ fi
 
 # Clean directories to guarantee a clean rebuild
 
+echo "Removing $(realpath ./prebuilt)"
 rm -rf ./prebuilt 2>/dev/null
-rm -rf ./build 2>/dev/null
-rm -rf ./src/icu 2>/dev/null
+echo "Removing $(realpath ./build)"
+#rm -rf ./build 2>/dev/null
 
 # Build for each ABI / Target
 
+echo
+mkdir -p "build"
+cmake_log_file="build/cmake_build_log.txt"
 for abi in "${android_abi_list[@]}"; do
-    cmake -B=build -S=src \
-        -DFLORIS_LIBRARY_TYPE=STATIC \
+    echo "Process target android/$abi"
+    echo -n "  Configuring..."
+    cmake -B=build -S=. \
         -DANDROID=1 \
         -DCMAKE_ANDROID_API=$android_api \
         -DCMAKE_ANDROID_ARCH_ABI=$abi \
-        -DLLVM_TOOLCHAIN="$llvm_toolchain" \
-        -DICU_PREBUILT_TARGET=1
-    cmake --build build
+        -DICU_DESKTOP_TARGET= \
+        -DICU_BUILD_FROM_SOURCE=1 \
+        -DICU_PREBUILT_TARGET=1 \
+        -DLLVM_TOOLCHAIN="$llvm_toolchain" >> "$cmake_log_file" 2>&1
+    if [ $? -eq 0 ]; then
+        echo " completed"
+    else
+        echo " failed ($?)"
+        continue
+    fi
+    echo -n "  Building..."
+    cmake --build build >> "$cmake_log_file" 2>&1
+    if [ $? -eq 0 ]; then
+        echo "    completed"
+    else
+        echo "    failed ($?)"
+    fi
 done
 for target in "${desktop_target_list[@]}"; do
-    cmake -B=build -S=src \
-        -DFLORIS_LIBRARY_TYPE=STATIC \
+    echo "Process target desktop/$target"
+    echo -n "  Configuring..."
+    cmake -B=build -S=. \
+        -DANDROID=0 \
+        -DCMAKE_ANDROID_API= \
+        -DCMAKE_ANDROID_ARCH_ABI= \
         -DICU_DESKTOP_TARGET=$target \
-        -DLLVM_TOOLCHAIN="$desktop_llvm_toolchain" \
-        -DICU_PREBUILT_TARGET=1
-    cmake --build build
+        -DICU_BUILD_FROM_SOURCE=1 \
+        -DICU_PREBUILT_TARGET=1 \
+        -DLLVM_TOOLCHAIN="$desktop_llvm_toolchain" >> "$cmake_log_file" 2>&1
+    if [ $? -eq 0 ]; then
+        echo " completed"
+    else
+        echo " failed ($?)"
+        continue
+    fi
+    echo -n "  Building..."
+    cmake --build build >> "$cmake_log_file" 2>&1
+    if [ $? -eq 0 ]; then
+        echo "    completed"
+    else
+        echo "    failed ($?)"
+    fi
 done
+echo "All targets processed. CMake build log available @ $(realpath $cmake_log_file)"
 
 # Install to prebuilt directory
 
+echo
+prebuilt_target_dir="prebuilt/libs/android"
+mkdir -p $prebuilt_target_dir
+echo "Installing Android libs to $(realpath $prebuilt_target_dir)"
 for abi in "${android_abi_list[@]}"; do
-    mkdir -p prebuilt/libs/android/$abi
+    mkdir -p $prebuilt_target_dir/$abi
     for icu_lib in "${icu_libs[@]}"; do
-        cp build/android/$abi/lib/libicu${icu_lib}_floris.a \
-            prebuilt/libs/android/$abi/libicu${icu_lib}_floris.a
+        cp build/src/android/$abi/lib/libicu${icu_lib}_floris.a \
+            $prebuilt_target_dir/$abi/libicu${icu_lib}_floris.a
     done
 done
+
+prebuilt_target_dir="prebuilt/libs/desktop"
+mkdir -p $prebuilt_target_dir
+echo "Installing Desktop libs to $(realpath $prebuilt_target_dir)"
 for target in "${desktop_target_list[@]}"; do
-    mkdir -p prebuilt/libs/desktop/$target
+    mkdir -p $prebuilt_target_dir/$target
     for icu_lib in "${icu_libs[@]}"; do
-        cp build/desktop/$target/lib/libicu${icu_lib}_floris.a \
-            prebuilt/libs/desktop/$target/libicu${icu_lib}_floris.a
+        cp build/src/desktop/$target/lib/libicu${icu_lib}_floris.a \
+            $prebuilt_target_dir/$target/libicu${icu_lib}_floris.a
     done
 done
-mkdir -p prebuilt/assets/icu
-cp build/host/share/icu_floris/$icu_version_major.$icu_version_minor/icudt${icu_version_major}l.dat \
-    prebuilt/assets/icu/icudt${icu_version_major}l.dat
-mkdir -p prebuilt/include
-cp -r build/host/include/* prebuilt/include
+
+prebuilt_target_dir="prebuilt/assets/icu"
+mkdir -p $prebuilt_target_dir
+echo "Installing ICU data file to $(realpath $prebuilt_target_dir)"
+mkdir -p $prebuilt_target_dir
+cp build/src/host/share/icu_floris/$icu_version_major.$icu_version_minor/icudt${icu_version_major}l.dat \
+    $prebuilt_target_dir/icudt${icu_version_major}l.dat
+
+prebuilt_target_dir="prebuilt/include"
+mkdir -p $prebuilt_target_dir
+echo "Installing ICU header files to $(realpath $prebuilt_target_dir)"
+mkdir -p $prebuilt_target_dir
+cp -r build/src/host/include/* $prebuilt_target_dir
+
+# Install to prebuilt directory
+
+echo
+echo "Script finished with exit code 0"
+exit 0

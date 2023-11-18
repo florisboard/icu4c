@@ -20,4 +20,3 @@ cd "$(realpath "$(dirname "$0")")" || exit 1
 
 rm -rf ./prebuilt 2>/dev/null
 rm -rf ./build 2>/dev/null
-rm -rf ./src/icu 2>/dev/null

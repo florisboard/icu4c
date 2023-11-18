@@ -11,5 +11,4 @@ Additionally the `prebuilt` directory also contains prebuilt desktop libraries f
 
 TODO:
 - Rework `src/data-feature-filter.json`, as it contains incorrect category names and some features may be too less/too much restricted.
-- Clean up the `src/CMakeLists.txt` script, as it still somewhat depends on FLORIS constants.
 - Add additional tests and make the test script more robust to unexpected machine states.
