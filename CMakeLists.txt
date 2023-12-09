@@ -54,4 +54,11 @@ else()
             INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/include"
         )
     endforeach()
+    if(ICU_ASSET_EXPORT_DIR)
+        set(src_asset_dir ${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/assets/icu)
+        set(dst_asset_dir ${ICU_ASSET_EXPORT_DIR})
+        execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${src_asset_dir}/icudt${ICU_VERSION_MAJOR}l.dat
+            ${dst_asset_dir}/icudt${ICU_VERSION_MAJOR}l.dat)
+    endif()
 endif()
