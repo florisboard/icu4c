@@ -9,5 +9,5 @@ insert_final_newline = true
 max_line_length = 120
 trim_trailing_whitespace = true
 
-[*.{json,yml}]
+[*.{json,jsonc,yml,md}]
 indent_size = 2
